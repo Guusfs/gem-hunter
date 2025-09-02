@@ -1,0 +1,97 @@
+/* Reset e base */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: #0a0e17;
+  font-family: 'JetBrains Mono', monospace;
+  color: #ffffff;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+}
+
+/* Container principal */
+.auth-container {
+  background: #10141f;
+  padding: 40px;
+  border-radius: 12px;
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.1);
+  width: 100%;
+  max-width: 420px;
+  text-align: center;
+}
+
+/* Logo com ícone */
+.logo-area {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 30px;
+}
+
+.logo-icon {
+  font-size: 32px;
+  color: #00f7ff;
+  margin-right: 10px;
+}
+
+.logo-text {
+  font-size: 28px;
+  color: #ffffff;
+  letter-spacing: 2px;
+}
+
+/* Inputs */
+form input {
+  width: 100%;
+  padding: 12px 16px;
+  margin-bottom: 15px;
+  background: #0f1624;
+  border: 1px solid #2b3348;
+  border-radius: 8px;
+  color: #ffffff;
+  font-size: 14px;
+}
+
+form input::placeholder {
+  color: #a3aab8;
+}
+
+/* Botões */
+button {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  background: #00f7ff;
+  color: #000000;
+  font-weight: bold;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+button:hover {
+  background: #0ff;
+}
+
+/* Links de troca de formulário */
+.auth-switch {
+  margin-top: 15px;
+  font-size: 14px;
+}
+
+.auth-switch a {
+  color: #00f7ff;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.auth-switch a:hover {
+  text-decoration: underline;
+}

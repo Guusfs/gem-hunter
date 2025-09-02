@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gem Hunter</title>
+
+  <!-- Ícones e Fontes -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700&display=swap" rel="stylesheet" />
+
+  <!-- Estilos -->
+  <link rel="stylesheet" href="js/css/variables.css" />
+  <link rel="stylesheet" href="js/css/layout.css" />
+  <link rel="stylesheet" href="js/css/components.css" />
+  <link rel="stylesheet" href="js/css/animations.css" />
+  <link rel="stylesheet" href="js/css/responsive.css" />
+
+  <!-- Favicon -->
+  <link rel="icon" href="favicon.ico" />
+</head>
+<body>
+  <!-- NAVBAR -->
+  <nav class="navbar">
+    <div class="logo">
+      <i class="fas fa-gem"></i>
+      <span>Gem Hunter</span>
+    </div>
+
+    <ul class="nav-links" id="navLinks">
+      <li><a href="#" class="nav-item active" data-section="dashboard">Dashboard</a></li>
+      <li><a href="#" class="nav-item" data-section="scanner">Scanner</a></li>
+      <li><a href="#" class="nav-item" data-section="novas">Novas Criptos</a></li>
+      <li><a href="#" class="nav-item" data-section="atualizacoes">Atualizações</a></li>
+      <li><a href="#" class="nav-item" data-section="portfolio">Portfólio</a></li>
+      <li><a href="#" class="nav-item" data-section="sentimento">Sentimento</a></li>
+      <li><a href="#" class="nav-item" data-section="entradaSaida">Entrada/Saída</a></li>
+      <li><a href="#" class="nav-item" data-section="historico">Histórico</a></li>
+      <li><a href="#" class="nav-item" data-section="configuracoes">Configurações</a></li>
+    </ul>
+
+    <!-- Direita: Hambúrguer + Sair -->
+    <div class="nav-right">
+      <button id="menuToggle" class="hamburger" aria-label="Abrir menu">
+        <i class="fas fa-bars"></i>
+      </button>
+      <a href="#" id="logoutBtn" class="logout-btn">
+        <i class="fas fa-sign-out-alt"></i><span>Sair</span>
+      </a>
+    </div>
+  </nav>
+
+  <!-- Seções -->
+  <section id="dashboard" class="section active">
+    <div class="container">
+      <h1 class="section-title">DASHBOARD</h1>
+      <div class="dashboard-grid">
+        <div class="dashboard-card">
+          <i class="fas fa-bullhorn"></i>
+          <div class="value" id="card-detected">0</div>
+          <h2>LANÇAMENTOS DETECTADOS</h2>
+        </div>
+        <div class="dashboard-card">
+          <i class="fas fa-bell"></i>
+          <div class="value" id="card-alerts">0</div>
+          <h2>ALERTAS ATIVOS</h2>
+        </div>
+        <div class="dashboard-card">
+          <i class="fas fa-coins"></i>
+          <div class="value" id="card-tracked">0</div>
+          <h2>MOEDAS MONITORADAS</h2>
+        </div>
+        <div class="dashboard-card">
+          <i class="fas fa-chart-line"></i>
+          <div class="value" id="card-accuracy">0%</div>
+          <h2>TAXA DE PRECISÃO IA</h2>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="scanner" class="section">
+    <div class="container">
+      <h1 class="section-title">SCANNER DE MERCADO</h1>
+      <div class="scanner-controls">
+        <button class="scanner-btn start" id="startScannerBtn"><i class="fas fa-play"></i> INICIAR SCANNER</button>
+        <button class="scanner-btn stop" id="stopScannerBtn"><i class="fas fa-stop"></i> PARAR SCANNER</button>
+        <div class="scanner-status"><div class="status-dot inactive" id="scannerStatusDot"></div><span id="scannerStatusText">Inativo</span></div>
+      </div>
+      <div class="scanner-log" id="scannerLog"></div>
+    </div>
+  </section>
+
+  <section id="novas" class="section">
+    <div class="container">
+      <h1 class="section-title">NOVAS CRIPTOS</h1>
+      <div id="novas-lista" class="neon-grid"></div>
+      <div style="text-align: center; margin-top: 20px;">
+        <button id="btn-carregar-mais" class="scanner-btn">Mostrar mais criptos</button>
+        <p id="mensagem-fim" style="margin-top: 10px; color: #ccc; display: none;">
+          🔒 Sem mais sugestões no momento.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section id="atualizacoes" class="section">
+    <div class="container">
+      <h1 class="section-title">ATUALIZAÇÕES</h1>
+      <div class="neon-grid" id="atualizacoes-lista"></div>
+    </div>
+  </section>
+
+  <section id="portfolio" class="section">
+    <h2 class="section-title">MEU PORTFÓLIO</h2>
+    <p class="section-subtitle">Acompanhe suas criptomoedas compradas</p>
+    <div id="portfolio-lista" class="neon-grid"></div>
+  </section>
+
+  <section id="sentimento" class="section">
+    <div class="container">
+      <h1 class="section-title">SENTIMENTO DE MERCADO</h1>
+      <div id="sentimento-container">
+        <div class="neon-card">
+          <i class="fas fa-smile-beam"></i>
+          <h2>Sentimento Atual</h2>
+          <p id="sentimento-texto">Carregando...</p>
+        </div>
+        <div class="neon-card">
+          <canvas id="graficoMedoGanancia" width="300" height="300"></canvas>
+          <h2>Índice de Medo & Ganância</h2>
+          <p id="indice-fng">Carregando...</p>
+        </div>
+        <div class="neon-card">
+          <i class="fas fa-comments"></i>
+          <h2>Redes Sociais</h2>
+          <p id="destaques-redes">Carregando dados das redes...</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="entradaSaida" class="section">
+    <div class="container">
+      <h1 class="section-title">ENTRADA / SAÍDA</h1>
+      <div class="neon-grid fluxo-grid" id="entradaSaida-lista">
+        <div class="neon-card" id="card-entradas">
+          <i class="fas fa-arrow-up"></i>
+          <h2>Grandes Entradas</h2>
+          <p id="fluxo-entradas">Carregando...</p>
+        </div>
+        <div class="neon-card" id="card-saidas">
+          <i class="fas fa-arrow-down"></i>
+          <h2>Saídas Relevantes</h2>
+          <p id="fluxo-saidas">Carregando...</p>
+        </div>
+        <div class="neon-card" id="card-saldo">
+          <i class="fas fa-exchange-alt"></i>
+          <h2>Fluxo Líquido</h2>
+          <p id="fluxo-saldo">Carregando...</p>
+        </div>
+      </div>
+      <div id="entrada-saida-painel" class="painel-grid" style="margin-top: 2rem;"></div>
+    </div>
+  </section>
+
+  <section id="historico" class="section">
+    <div class="container">
+      <h1 class="section-title">HISTÓRICO</h1>
+      <div class="scanner-log" style="height: 250px; overflow-y: auto; text-align: left;" id="historico-log">
+        <div>[08:01:02] ADA (Cardano) subiu +15.3% → 🔺 COMPRA FORTE</div>
+        <div>[08:04:22] MATIC (Polygon) caiu -4.1% → ❌ NÃO RECOMENDADO</div>
+        <div>[08:08:50] FET (Fetch.ai) subiu +21.7% → 🔺 COMPRA FORTE</div>
+        <div>[08:13:11] PEPE (Pepe Coin) caiu -8.9% → ❌ NÃO RECOMENDADO</div>
+        <div>[08:17:09] SOL (Solana) subiu +11.8% → 🔺 COMPRA FORTE</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="configuracoes" class="section">
+    <div class="container">
+      <h1 class="section-title">CONFIGURAÇÕES</h1>
+      <div class="neon-grid"></div>
+    </div>
+  </section>
+
+  <!-- Chart.js deve vir antes do init -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script type="module" src="js/core/init.js"></script>
+  <script type="module" src="js/features/entradaSaida.js"></script>
+</body>
+</html>

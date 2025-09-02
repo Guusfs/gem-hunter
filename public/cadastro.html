@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Cadastro - Gem Hunter</title>
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="js/css/variables.css" />
+  <link rel="stylesheet" href="js/css/layout.css" />
+  <link rel="stylesheet" href="js/css/components.css" />
+  <link rel="stylesheet" href="js/css/animations.css" />
+  <link rel="stylesheet" href="js/css/responsive.css" />
+  <style>
+    .auth-wrap{max-width:520px;margin:6vh auto;padding:28px 24px;border:2px solid #00ffe5;border-radius:18px;
+      box-shadow:0 0 24px #00ffe533, inset 0 0 40px #00ffee11;background:linear-gradient(145deg,#0e0e14,#171b28);text-align:center}
+    .brand{display:flex;align-items:center;gap:.6rem;justify-content:center;margin-bottom:10px}
+    .brand i{color:#00e6ff;font-size:26px}.brand span{font-family:'Orbitron',sans-serif;font-size:28px;color:#e9faff;text-shadow:0 0 8px #00f0ff}
+    .auth-row{position:relative;margin:12px 0}
+    .auth-input{width:100%;padding:14px 16px;border-radius:12px;border:1px solid #1e2a38;background:#e6eefb;color:#001320;font-size:16px;font-weight:600}
+    .auth-input:focus{outline:none;box-shadow:0 0 0 3px #00e6ff55}
+    .btn-primary{width:100%;padding:14px;border:none;border-radius:14px;margin-top:10px;background:linear-gradient(135deg,#00f0ff,#00bfff);color:#00131a;font-weight:800;letter-spacing:.5px;box-shadow:0 0 16px #00f0ff88}
+    .link-row{margin-top:10px}.link-row a{color:#8bdfff;text-decoration:none}.link-row a:hover{text-decoration:underline}
+    .msg-err{color:#ff6b6b;margin-top:10px}.msg-ok{color:#12d87c;margin-top:8px}
+  </style>
+</head>
+<body>
+  <div class="auth-wrap">
+    <div class="brand">
+      <i class="fas fa-gem"></i><span>Gem Hunter</span>
+    </div>
+
+    <form id="registerForm" novalidate>
+      <div class="auth-row">
+        <input type="email" id="email" class="auth-input" placeholder="E-mail" required />
+      </div>
+      <div class="auth-row">
+        <input type="password" id="password" class="auth-input" placeholder="Senha (mín. 6)" minlength="6" required />
+      </div>
+      <button id="btnCadastrar" type="submit" class="btn-primary">Cadastrar</button>
+
+      <div class="link-row">Já tem conta? <a href="login.html">Fazer login</a></div>
+      <div id="error" class="msg-err"></div>
+      <div id="ok" class="msg-ok"></div>
+    </form>
+  </div>
+
+  <script>
+    const form = document.getElementById('registerForm');
+    const btn  = document.getElementById('btnCadastrar');
+    const elErr= document.getElementById('error');
+    const elOk = document.getElementById('ok');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      elErr.textContent=''; elOk.textContent='';
+
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+
+      if (!email || !password) { elErr.textContent = 'Informe e-mail e senha.'; return; }
+      if (password.length < 6) { elErr.textContent = 'A senha deve ter pelo menos 6 caracteres.'; return; }
+
+      btn.disabled = true; btn.textContent = 'Enviando...';
+
+      try {
+        const res = await fetch('/api/auth/register', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        const data = await res.json().catch(()=> ({}));
+        if (!res.ok) {
+          elErr.textContent = data?.error || `Falha no cadastro (HTTP ${res.status}).`;
+        } else {
+          elOk.textContent = 'Cadastro realizado com sucesso! Redirecionando...';
+          setTimeout(()=> { window.location.href = 'login.html'; }, 900);
+        }
+      } catch (err) {
+        elErr.textContent = 'Erro de conexão.';
+      } finally {
+        btn.disabled = false; btn.textContent = 'Cadastrar';
+      }
+    });
+  </script>
+</body>
+</html>

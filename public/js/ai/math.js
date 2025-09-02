@@ -1,0 +1,1 @@
+//SMA, EMA, desvio padrão

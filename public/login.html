@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login - Gem Hunter</title>
+
+  <!-- fontes/ícones e CSS do projeto -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="js/css/variables.css" />
+  <link rel="stylesheet" href="js/css/layout.css" />
+  <link rel="stylesheet" href="js/css/components.css" />
+  <link rel="stylesheet" href="js/css/animations.css" />
+  <link rel="stylesheet" href="js/css/responsive.css" />
+  <style>
+    /* Container do form */
+    .auth-wrap{
+      max-width: 520px;margin: 6vh auto;padding: 28px 24px;
+      border:2px solid #00ffe5;border-radius:18px;
+      box-shadow:0 0 24px #00ffe533, inset 0 0 40px #00ffee11;
+      background:linear-gradient(145deg,#0e0e14,#171b28);text-align:center
+    }
+    .brand{display:flex;align-items:center;gap:.6rem;justify-content:center;margin-bottom:10px}
+    .brand i{color:#00e6ff;font-size:26px}
+    .brand span{font-family:'Orbitron',sans-serif;font-size:28px;color:#e9faff;text-shadow:0 0 8px #00f0ff}
+    .auth-row{position:relative;margin:12px 0}
+    .auth-input{
+      width:100%;padding:14px 44px 14px 16px;border-radius:12px;border:1px solid #1e2a38;
+      background:#e6eefb;color:#001320;font-size:16px;font-weight:600
+    }
+    .auth-input:focus{outline:none;box-shadow:0 0 0 3px #00e6ff55}
+    .eye-btn{
+      position:absolute;right:10px;top:50%;transform:translateY(-50%);
+      background:transparent;border:none;color:#233041;font-size:18px;cursor:pointer
+    }
+    .btn-primary{
+      width:100%;padding:14px;border:none;border-radius:14px;margin-top:10px;
+      background:linear-gradient(135deg,#00f0ff,#00bfff);color:#00131a;
+      font-weight:800;letter-spacing:.5px;box-shadow:0 0 16px #00f0ff88
+    }
+    .link-row{margin-top:10px}
+    .link-row a{color:#8bdfff;text-decoration:none}
+    .link-row a:hover{text-decoration:underline}
+    .muted{opacity:.85}
+    .msg-err{color:#ff6b6b;margin-top:10px}
+  </style>
+</head>
+<body>
+  <div class="auth-wrap">
+    <div class="brand">
+      <i class="fas fa-gem"></i><span>Gem Hunter</span>
+    </div>
+
+    <form id="loginForm" novalidate>
+      <div class="auth-row">
+        <input id="email" type="email" class="auth-input" placeholder="Seu e-mail" required />
+      </div>
+
+      <div class="auth-row">
+        <input id="password" type="password" class="auth-input" placeholder="Sua senha" required />
+        <button type="button" class="eye-btn" id="togglePwd" aria-label="Mostrar/ocultar senha">
+          <i class="fa-regular fa-eye"></i>
+        </button>
+      </div>
+
+      <button id="btnLogin" class="btn-primary" type="submit">Entrar</button>
+
+      <div class="link-row">
+        <a href="esqueci.html">Esqueci a senha</a>
+      </div>
+      <div class="link-row muted">
+        Não tem conta? <a href="cadastro.html" id="goRegister">Cadastre-se</a>
+      </div>
+
+      <div id="err" class="msg-err"></div>
+    </form>
+  </div>
+
+  <script>
+    // mostrar/ocultar senha
+    const pwd = document.getElementById('password');
+    const eye = document.getElementById('togglePwd');
+    eye.addEventListener('click', () => {
+      const isPwd = pwd.type === 'password';
+      pwd.type = isPwd ? 'text' : 'password';
+      eye.innerHTML = isPwd ? '<i class="fa-regular fa-eye-slash"></i>' : '<i class="fa-regular fa-eye"></i>';
+    });
+
+    // login submit
+    const form = document.getElementById('loginForm');
+    const btn  = document.getElementById('btnLogin');
+    const err  = document.getElementById('err');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      err.textContent = '';
+      btn.disabled = true; btn.textContent = 'Entrando...';
+
+      try {
+        const email = document.getElementById('email').value.trim();
+        const password = document.getElementById('password').value;
+
+        const r = await fetch('/api/auth/login', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ email, password })
+        });
+        const j = await r.json().catch(()=> ({}));
+        if(!r.ok){
+          err.textContent = j?.error || `Falha no login (HTTP ${r.status}).`;
+        } else {
+          localStorage.setItem('token', j.token);
+          window.location.href = '/';
+        }
+      } catch (ex) {
+        err.textContent = 'Erro de conexão.';
+      } finally {
+        btn.disabled = false; btn.textContent = 'Entrar';
+      }
+    });
+  </script>
+</body>
+</html>

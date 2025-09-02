@@ -1,0 +1,103 @@
+/* --- NAVBAR --- */
+body {
+  background-color: #0a0f1c;
+  font-family: 'Inter', sans-serif;
+  color: #ffffff;
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #0a0f1c;
+  padding: 10px 30px;
+  border-bottom: 1px solid #00f7ff11;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 20px;
+  font-weight: 600;
+  color: #fffdfd;
+  gap: 10px;
+}
+
+.logo i {
+  color: #00f7ff;
+  font-size: 20px;
+}
+
+/* --- NAV LINKS --- */
+.nav-links {
+  display: flex;
+  gap: 25px;
+  list-style: none;
+}
+
+.nav-item {
+  color: #ccc;
+  font-family: 'JetBrains Mono', monospace;
+  text-decoration: none;
+  text-transform: uppercase;
+  font-size: 14px;
+  transition: color 0.3s ease;
+}
+
+.nav-item:hover,
+.nav-item.active {
+  color: #00f7ff;
+  border-bottom: 2px solid #00f7ff;
+  padding-bottom: 2px;
+}
+
+/* --- CONTEÚDO CENTRALIZADO --- */
+.container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.section-title {
+  font-size: 2rem;
+  color: #00f7ff;
+  text-shadow: 0 0 10px #00f7ff;
+  margin-bottom: 20px;
+}
+
+/* Scanner buttons centralizados */
+.scanner-controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 25px;
+}
+
+/* Scanner log terminal */
+.scanner-log {
+  background-color: #000;
+  color: #0f0;
+  font-family: 'JetBrains Mono', monospace;
+  padding: 20px;
+  height: 300px;
+  overflow-y: auto;
+  border-radius: 8px;
+  border: 1px solid #00f7ff44;
+  text-align: left;
+}
+.section {
+  display: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.section.active {
+  display: block;
+  opacity: 1;
+}

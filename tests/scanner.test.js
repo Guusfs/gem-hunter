@@ -1,0 +1,1 @@
+//Testes futuros para scanner e AI

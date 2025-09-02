@@ -1,0 +1,1 @@
+//renderização dos cards de cripto

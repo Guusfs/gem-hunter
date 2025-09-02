@@ -1,0 +1,637 @@
+/* === GLOBAL === */
+body {
+  background-color: #090b10;
+  color: white;
+  font-family: 'Orbitron', sans-serif;
+  margin: 0;
+  padding: 0;
+  text-align: center;
+}
+
+/* === DASHBOARD FUTURISTA === */
+.dashboard-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 20px;
+  padding: 30px;
+  margin-top: 20px;
+}
+
+.dashboard-card {
+  background: linear-gradient(145deg, #0e0e14, #1a1f2f);
+  border: 2px solid #00ffe5;
+  border-radius: 18px;
+  box-shadow: 0 0 20px #00ffe577, 0 0 50px #00ffee33 inset;
+  padding: 22px;
+  transition: 0.3s ease-in-out;
+  width: 220px;
+  text-align: center;
+}
+
+.dashboard-card h2 {
+  font-size: 1.2rem;
+  color: #00f0ff;
+  margin-bottom: 8px;
+  text-shadow: 0 0 5px #00f0ff;
+}
+
+.dashboard-card .value {
+  font-size: 2rem;
+  color: #00ffcc;
+  font-weight: bold;
+  margin-bottom: 6px;
+  text-shadow: 0 0 6px #00ffccaa;
+}
+
+.dashboard-card i {
+  font-size: 24px;
+  margin-bottom: 8px;
+  color: #00ffe5;
+}
+
+/* === SCANNER FUTURISTA === */
+.scanner-btn {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 16px;
+  font-weight: 700;
+  text-transform: uppercase;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 14px;
+  letter-spacing: 1px;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  margin: 0 8px;
+}
+
+.scanner-btn.start {
+  background: linear-gradient(135deg, #00f0ff, #00bfff);
+  color: #000;
+  box-shadow: 0 0 16px #00f0ffcc, 0 0 32px #00d0ffaa;
+}
+
+.scanner-btn.start:hover {
+  background: linear-gradient(135deg, #00aaff, #0099cc);
+  box-shadow: 0 0 20px #00d0ff, 0 0 30px #00f0ffaa;
+}
+
+.scanner-btn.stop {
+  background-color: #2c2c2c;
+  color: #eee;
+  box-shadow: 0 0 6px #444;
+}
+
+.scanner-btn.stop:hover {
+  background-color: #3d3d3d;
+  box-shadow: 0 0 8px #555;
+}
+
+.scanner-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 10px 18px;
+  background: rgba(0, 255, 255, 0.08);
+  border: 1px solid #00f7ff55;
+  border-radius: 12px;
+  color: #00f7ff;
+  font-family: 'Orbitron', monospace;
+  box-shadow: 0 0 10px #00f7ff44;
+  margin-left: 10px;
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 8px;
+  transition: 0.3s;
+}
+
+.status-dot.active {
+  background-color: #00ff88;
+  box-shadow: 0 0 12px #00ff88;
+}
+
+.status-dot.inactive {
+  background-color: #ff2d2d;
+  box-shadow: 0 0 12px #ff2d2d;
+}
+
+/* === NOVAS CRIPTOS === */
+#novas-lista {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 20px;
+  padding: 20px;
+}
+
+#novas-lista .neon-card {
+  background: linear-gradient(145deg, #0e0e14, #1a1f2f);
+  border: 2px solid #00ffe5;
+  border-radius: 18px;
+  box-shadow: 0 0 20px #00ffe577, 0 0 50px #00ffee33 inset;
+  padding: 22px;
+  transition: 0.3s ease-in-out;
+  width: 280px;
+  text-align: center;
+}
+
+#novas-lista .neon-card:hover {
+  transform: scale(1.03);
+  box-shadow: 0 0 30px #00fff0bb, 0 0 60px #00ffee55 inset;
+}
+
+#novas-lista img {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 1px solid #00f0ff;
+  box-shadow: 0 0 12px #00f0ff99;
+  background-color: #fff;
+}
+
+#novas-lista .card-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 10px;
+}
+
+#novas-lista .card-actions button,
+#novas-lista .card-actions a {
+  background: linear-gradient(to right, #00ffe5, #00bfbf);
+  color: #000;
+  border: none;
+  font-weight: bold;
+  padding: 6px 14px;
+  border-radius: 10px;
+  font-family: 'Orbitron', sans-serif;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.3s ease;
+}
+
+#novas-lista .card-actions button:hover,
+#novas-lista .card-actions a:hover {
+  background: linear-gradient(to right, #00eedd, #00cccc);
+  box-shadow: 0 0 12px #00fff088;
+}
+
+/* === PORTFÓLIO === */
+#portfolio-container, #portfolio-lista {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 20px;
+  padding: 30px;
+}
+
+.portfolio-card {
+  background: linear-gradient(145deg, #0a0a0a, #10101a);
+  border: 2px solid #00f0ff;
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: 0 0 20px #00f0ff88, 0 0 40px #00f0ff44 inset;
+  max-width: 320px;
+  text-align: center;
+  backdrop-filter: blur(4px);
+  color: #fff;
+  font-family: 'Orbitron', sans-serif;
+  transition: transform 0.3s ease;
+}
+
+.portfolio-card:hover {
+  transform: translateY(-8px) scale(1.02);
+  box-shadow: 0 0 30px #00f0ffaa, 0 0 60px #00f0ff33 inset;
+}
+
+.card-header {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.card-header h2 {
+  font-size: 1.1rem;
+  color: #00f0ff;
+  text-shadow: 0 0 5px #00f0ff, 0 0 10px #00f0ff;
+  margin: 0;
+}
+
+.coin-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid #00f0ff;
+  box-shadow: 0 0 10px #00f0ff;
+  background-color: #fff;
+}
+
+.card-info p {
+  color: #cfcfcf;
+  font-size: 0.9rem;
+  margin: 6px 0;
+}
+
+.card-info span {
+  font-weight: bold;
+}
+
+.btn-remover {
+  margin-top: 12px;
+  background: linear-gradient(135deg, #ff3c3c, #ff0055);
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: bold;
+  letter-spacing: 1px;
+  box-shadow: 0 0 10px #ff005544;
+  transition: background 0.3s ease, transform 0.2s ease;
+}
+
+.btn-remover:hover {
+  background: linear-gradient(135deg, #ff1c1c, #cc0022);
+  transform: scale(1.05);
+}
+/* Esconde todas as seções por padrão */
+.section {
+  display: none;
+}
+
+/* Mostra apenas a seção ativa */
+.section.active {
+  display: block;
+}
+
+/* Estilização opcional para item ativo no menu */
+.nav-item.active {
+  color: #0ff; /* azul neon, por exemplo */
+  font-weight: bold;
+}
+.news-card {
+  background-color: #111;
+  border: 1px solid #222;
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: 0 0 8px rgba(0, 255, 255, 0.1);
+  transition: transform 0.2s ease;
+}
+.news-card:hover {
+  transform: scale(1.01);
+}
+.sentimento-valor {
+  font-size: 1.2em;
+  margin-top: 10px;
+  color: #00ffc8;
+  font-weight: bold;
+  text-shadow: 0 0 6px #00ffc8;
+}
+.fluxo-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 400px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.fluxo-card {
+  background: #0d0d0d;
+  border: 1px solid #0ff;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 0 15px rgba(0, 255, 255, 0.2);
+}
+
+.fluxo-card h2 {
+  font-size: 1.2rem;
+  margin-bottom: 8px;
+  color: #fff;
+}
+
+.fluxo-card p {
+  font-size: 1.1rem;
+  color: #ccc;
+}
+
+.fluxo-card.positivo p {
+  color: lime;
+}
+
+.fluxo-card.negativo p {
+  color: red;
+}
+.fluxo-grid {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-top: 20px;
+}
+
+.fluxo-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid #00ffff33;
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+  width: 260px;
+  transition: 0.3s ease;
+}
+
+.fluxo-card:hover {
+  box-shadow: 0 0 15px #00ffff66;
+  transform: translateY(-3px);
+}
+
+.fluxo-card i {
+  font-size: 28px;
+  margin-bottom: 10px;
+  color: #00ffff;
+}
+
+.fluxo-card h3 {
+  font-size: 18px;
+  margin-bottom: 6px;
+  color: #fff;
+}
+
+.fluxo-card p {
+  font-size: 16px;
+  color: #ccc;
+}
+.variacao-positiva {
+  color: #00ff88;
+  font-weight: bold;
+}
+.variacao-negativa {
+  color: #ff4d4d;
+  font-weight: bold;
+}
+.fluxo-card {
+  background-color: #1c1c1c;
+  border-radius: 10px;
+  padding: 20px;
+  margin: 10px;
+  text-align: center;
+  color: white;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+}
+
+.fluxo-card i {
+  font-size: 30px;
+}
+
+.fluxo-card h3 {
+  font-size: 1.2rem;
+  margin-top: 10px;
+}
+
+.fluxo-card p {
+  font-size: 1.5rem;
+  margin-top: 10px;
+  font-weight: bold;
+}
+/* ===== Fluxo (Entradas/Saídas) — itens, infos e botões ===== */
+
+.flux-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 1rem;
+  padding: .85rem 1rem;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.03);
+  margin: .6rem 0;
+}
+
+.flux-info {
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  gap: .8rem;
+  align-items: center;
+  text-align: left; /* melhora legibilidade */
+}
+
+.flux-img {
+  width: 42px; height: 42px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid #00f0ff;
+  box-shadow: 0 0 10px rgba(0,255,255,0.25);
+  background: #fff;
+}
+
+.flux-title { font-size: 1rem; line-height: 1.2; }
+.flux-meta  { font-size: .92rem; opacity: .9; }
+
+/* botões em coluna, com respiro */
+.btn-group-vert {
+  display: flex;
+  flex-direction: column;
+  gap: .55rem;
+}
+
+/* botão maior p/ usabilidade */
+.btn-lg { padding: .65rem 1rem; font-size: .95rem; border-radius: 12px; }
+
+/* variação outline (para o link da CoinGecko) mantendo estilo neon */
+.scanner-btn.outline {
+  background: transparent;
+  color: #00f7ff;
+  border: 1px solid rgba(0, 255, 255, .55);
+  box-shadow: 0 0 12px rgba(0,255,255,.25) inset, 0 0 14px rgba(0,255,255,.15);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.scanner-btn.outline:hover {
+  border-color: rgba(0,255,255,.9);
+  box-shadow: 0 0 16px rgba(0,255,255,.45) inset, 0 0 18px rgba(0,255,255,.35);
+}
+
+/* Responsivo: empilha os botões lado a lado em telas pequenas */
+@media (max-width: 520px) {
+  .flux-item {
+    grid-template-columns: 1fr;
+    gap: .8rem;
+  }
+  .btn-group-vert {
+    flex-direction: row;
+    justify-content: flex-end;
+  }
+}
+#cfg-form .cfg-group {
+  margin: 14px 0 8px;
+  padding: 12px;
+  border: 1px solid #00ffff33;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.02);
+}
+#cfg-form h3 { margin: 0 0 10px; color: #00f0ff; }
+#cfg-form label { display: inline-block; margin: 6px 12px 6px 0; }
+#cfg-form input[type="range"] { width: 260px; vertical-align: middle; }
+#cfg-form .muted { opacity: .85; margin-left: 8px; }
+/* ===== Botão Sair – pill neon com texto expansível ===== */
+#logoutBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  color: #d9eaff;
+  font-weight: 600;
+  text-shadow: 0 0 5px rgba(255, 0, 30, 0.65);
+  border: 1px solid rgba(255, 53, 53, 0.218);
+  background: linear-gradient(135deg, rgba(162, 0, 0, 0.07), rgba(255, 34, 34, 0.02));
+  box-shadow: 0 0 10px rgba(135, 14, 14, 0.15) inset;
+  position: relative;
+  overflow: hidden;
+  transition: transform .2s ease, box-shadow .25s ease, border-color .25s ease, color .25s ease;
+}
+
+/* Ícone */
+#logoutBtn i {
+  font-size: 15px;
+  transform: translateY(0);
+  transition: transform .25s ease;
+}
+
+/* Texto escondido inicialmente */
+#logoutBtn span {
+  opacity: 0;
+  max-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  transition: max-width .25s ease, opacity .25s ease;
+}
+
+/* Hover: mostra o texto e glow */
+#logoutBtn:hover {
+  border-color: rgba(156, 4, 4, 0.55);
+  color: #ff0000;
+  box-shadow: 0 0 14px rgba(181, 0, 0, 0.4), 0 0 30px rgba(115, 0, 0, 0.15) inset;
+  transform: translateY(-1px);
+}
+#logoutBtn:hover i { transform: translateY(-1px); }
+#logoutBtn:hover span {
+  opacity: 1;
+  max-width: 80px;
+}
+
+/* Brilho radial que segue o mouse */
+#logoutBtn::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(120px 120px at var(--x, 50%) var(--y, 50%), rgba(255, 0, 0, 0.18), transparent 60%);
+  opacity: 0;
+  transition: opacity .25s ease;
+  pointer-events: none;
+}
+#logoutBtn:hover::after { opacity: 1; }
+/* --- Navbar acima de tudo --- */
+.navbar {
+  position: sticky;
+  top: 0;
+  z-index: 1000; /* header acima do conteúdo */
+}
+
+/* --- Menu mobile/dropdown flutuante --- */
+.mobile-menu {
+  position: fixed;          /* não é cortado por nada */
+  top: 56px;                /* logo abaixo da barra */
+  right: 12px;
+  width: 220px;
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+  background: rgba(10, 12, 18, 0.92);
+  border: 1px solid rgba(0,255,255,.15);
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.45), 0 0 20px rgba(0,255,255,.15);
+  backdrop-filter: blur(8px);
+  z-index: 2000;            /* acima do header */
+}
+
+.mobile-menu a {
+  display: block;
+  padding: 12px 14px;
+  color: #e8faff;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+}
+.mobile-menu a:last-child { border-bottom: 0; }
+.mobile-menu a:hover {
+  background: rgba(0,255,255,.06);
+}
+
+/* backdrop para clique-fora */
+.mobile-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.35);
+  z-index: 1500;            /* abaixo do menu, acima do conteúdo */
+}
+
+/* trava o scroll do fundo quando o menu está aberto */
+body.no-scroll { overflow: hidden; }
+/* container da direita (hambúrguer + sair) */
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+/* botão sair */
+.logout-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #ff4d4d;
+  font-weight: bold;
+  text-shadow: 0 0 6px #ff4d4d;
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+
+.logout-btn span {
+  opacity: 0;
+  max-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  transition: all 0.3s ease;
+}
+
+.logout-btn:hover span {
+  opacity: 1;
+  max-width: 100px;
+}
+
+.logout-btn:hover {
+  color: #ff1c1c;
+  text-shadow: 0 0 8px #ff1c1c, 0 0 16px #ff0000;
+}
+
+/* botão hambúrguer */
+.hamburger {
+  background: transparent;
+  border: none;
+  font-size: 22px;
+  color: #00f0ff;
+  cursor: pointer;
+  padding: 6px;
+  transition: transform 0.2s ease;
+}
+
+.hamburger:hover {
+  transform: scale(1.2);
+}

@@ -1,0 +1,22 @@
+# Node
+node_modules/
+npm-debug.log*
+pnpm-lock.yaml
+yarn.lock
+.DS_Store
+
+# Builds/temps
+dist/
+build/
+coverage/
+*.log
+*.tmp
+
+# Ambiente e segredos
+.env
+.env.local
+.env.*.local
+
+# IDEs
+.vscode/
+.idea/

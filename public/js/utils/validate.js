@@ -1,0 +1,1 @@
+//Validação de dados da API

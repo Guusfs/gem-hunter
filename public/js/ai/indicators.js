@@ -1,0 +1,1 @@
+//RSI, MACD, Bollinger, Volume, Candlestick

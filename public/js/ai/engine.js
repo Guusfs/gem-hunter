@@ -1,0 +1,1 @@
+//generateAIPrediction, análise técnica

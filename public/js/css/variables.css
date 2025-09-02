@@ -1,0 +1,8 @@
+/*Paleta de cores e espaçamentos*/
+
+:root {
+  --primary: #00c853;
+  --danger: #d50000;
+  --bg-dark: #111;
+  --text-green: #0f0;
+}
