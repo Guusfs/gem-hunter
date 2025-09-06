@@ -1,6 +1,6 @@
 // routes/portfolio.js
 import express from 'express';
-import Portfolio from '../models/Portfolio.js';
+import Portfolio from '../models/portfolio.js';
 import { verifyToken } from '../middlewares/verifyToken.js';
 
 // Utils CoinGecko (com cache/retry)

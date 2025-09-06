@@ -1,7 +1,7 @@
 // routes/fluxo.js
 import express from 'express';
 import { verifyToken } from '../middlewares/verifyToken.js';
-import Portfolio from '../models/Portfolio.js';
+import Portfolio from '../models/portfolio.js';
 import { slugifyForCoingecko, getUsdPrices } from '../utils/coingecko.js';
 
 const router = express.Router();

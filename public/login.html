@@ -39,11 +39,11 @@
       background:linear-gradient(135deg,#00f0ff,#00bfff);color:#00131a;
       font-weight:800;letter-spacing:.5px;box-shadow:0 0 16px #00f0ff88
     }
-    .link-row{margin-top:10px}
+    .link-row{margin-top:12px; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;}
     .link-row a{color:#8bdfff;text-decoration:none}
     .link-row a:hover{text-decoration:underline}
     .muted{opacity:.85}
-    .msg-err{color:#ff6b6b;margin-top:10px}
+    .msg-err{color:#ff6b6b;margin-top:10px; min-height: 20px;}
   </style>
 </head>
 <body>
@@ -54,11 +54,11 @@
 
     <form id="loginForm" novalidate>
       <div class="auth-row">
-        <input id="email" type="email" class="auth-input" placeholder="Seu e-mail" required />
+        <input id="email" type="email" class="auth-input" placeholder="Seu e-mail" autocomplete="email" required autofocus />
       </div>
 
       <div class="auth-row">
-        <input id="password" type="password" class="auth-input" placeholder="Sua senha" required />
+        <input id="password" type="password" class="auth-input" placeholder="Sua senha" autocomplete="current-password" required />
         <button type="button" class="eye-btn" id="togglePwd" aria-label="Mostrar/ocultar senha">
           <i class="fa-regular fa-eye"></i>
         </button>
@@ -67,18 +67,16 @@
       <button id="btnLogin" class="btn-primary" type="submit">Entrar</button>
 
       <div class="link-row">
-        <a href="esqueci.html">Esqueci a senha</a>
-      </div>
-      <div class="link-row muted">
-        Não tem conta? <a href="cadastro.html" id="goRegister">Cadastre-se</a>
+        <a href="#" id="forgotLink">Esqueci a senha</a>
+        <a href="/cadastro.html">Criar conta</a>
       </div>
 
-      <div id="err" class="msg-err"></div>
+      <p id="err" class="msg-err"></p>
     </form>
   </div>
 
   <script>
-    // mostrar/ocultar senha
+    // Mostrar/ocultar senha
     const pwd = document.getElementById('password');
     const eye = document.getElementById('togglePwd');
     eye.addEventListener('click', () => {
@@ -87,7 +85,7 @@
       eye.innerHTML = isPwd ? '<i class="fa-regular fa-eye-slash"></i>' : '<i class="fa-regular fa-eye"></i>';
     });
 
-    // login submit
+    // Login submit
     const form = document.getElementById('loginForm');
     const btn  = document.getElementById('btnLogin');
     const err  = document.getElementById('err');
@@ -111,12 +109,32 @@
           err.textContent = j?.error || `Falha no login (HTTP ${r.status}).`;
         } else {
           localStorage.setItem('token', j.token);
+          sessionStorage.setItem('token', j.token);
           window.location.href = '/';
         }
       } catch (ex) {
         err.textContent = 'Erro de conexão.';
       } finally {
         btn.disabled = false; btn.textContent = 'Entrar';
+      }
+    });
+
+    // Esqueci a senha
+    document.getElementById('forgotLink').addEventListener('click', async (e) => {
+      e.preventDefault();
+      const email = prompt('Digite seu e-mail de cadastro:');
+      if (!email) return;
+
+      try {
+        const r = await fetch('/api/auth/forgot-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        });
+        const j = await r.json();
+        alert(j.message || j.error || 'Solicitação enviada.');
+      } catch (err) {
+        alert('Erro ao solicitar redefinição.');
       }
     });
   </script>

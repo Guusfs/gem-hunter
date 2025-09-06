@@ -2,16 +2,24 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
-import crypto from 'crypto';
+import nodemailer from 'nodemailer';
 import User from '../models/User.js';
-import { sendMail } from '../utils/mailer.js'; // << crie utils/mailer.js conforme te passei
 
 dotenv.config();
 const router = express.Router();
 
-// =======================
+// --- Configura transportador de e-mails ---
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,
+  port: Number(process.env.SMTP_PORT) || 587,
+  secure: process.env.SMTP_SECURE === 'true',
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
+});
+
 // Registro
-// =======================
 router.post('/register', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -29,9 +37,7 @@ router.post('/register', async (req, res) => {
   }
 });
 
-// =======================
 // Login
-// =======================
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -42,10 +48,11 @@ router.post('/login', async (req, res) => {
     const senhaCorreta = await usuario.comparePassword(password);
     if (!senhaCorreta) return res.status(401).json({ error: 'Senha incorreta' });
 
-    // 🔑 Assina com 'userId' para alinhar com verifyToken/rotas
-    const token = jwt.sign({ userId: usuario._id }, process.env.JWT_SECRET, {
-      expiresIn: '2h',
-    });
+    const token = jwt.sign(
+      { userId: usuario._id },
+      process.env.JWT_SECRET,
+      { expiresIn: '2h' }
+    );
 
     res.json({ token, user: { id: usuario._id, email: usuario.email } });
   } catch (err) {
@@ -54,93 +61,71 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// =======================
-// Esqueci a Senha (gera token e envia e-mail)
-// =======================
-router.post('/forgot', async (req, res) => {
+// --- Esqueci minha senha ---
+router.post('/forgot-password', async (req, res) => {
   try {
     const { email } = req.body;
-    if (!email) return res.status(400).json({ error: 'Informe o e-mail' });
+    const usuario = await User.findOne({ email });
+    if (!usuario) return res.status(404).json({ error: 'Usuário não encontrado' });
 
-    const user = await User.findOne({ email });
-    // Para não vazar se existe ou não, sempre responde OK
-    if (!user) {
-      return res.json({ message: 'Se existir conta, enviaremos instruções.' });
-    }
+    // cria token temporário (30min)
+    const token = jwt.sign(
+      { userId: usuario._id },
+      process.env.JWT_SECRET,
+      { expiresIn: '30m' }
+    );
 
-    // Token bruto (não salvar o bruto no DB)
-    const rawToken = crypto.randomBytes(32).toString('hex');
-    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const resetLink = `${process.env.APP_URL}/reset-password.html?token=${token}`;
 
-    user.resetPasswordTokenHash = tokenHash;
-    user.resetPasswordExpires = new Date(Date.now() + 30 * 60 * 1000); // 30min
-    await user.save();
-
-    const appUrl = process.env.APP_URL || 'http://localhost:3000';
-    const resetUrl = `${appUrl}/reset.html?token=${rawToken}`;
-
-    const html = `
-      <p>Olá!</p>
-      <p>Recebemos um pedido para redefinir sua senha no Gem Hunter.</p>
-      <p><a href="${resetUrl}" style="display:inline-block;padding:10px 16px;background:#00eaff;color:#000;text-decoration:none;border-radius:8px;">Redefinir senha</a></p>
-      <p>Se você não solicitou, ignore este e-mail.</p>
-    `;
-
-    await sendMail({
-      to: email,
-      subject: 'Redefinição de senha - Gem Hunter',
-      html,
-      text: `Abra o link para redefinir sua senha: ${resetUrl}`,
+    // envia o e-mail
+    await transporter.sendMail({
+      from: process.env.FROM_EMAIL,
+      to: usuario.email,
+      subject: '🔑 Recuperação de senha - Gem Hunter',
+      html: `
+        <p>Olá,</p>
+        <p>Você solicitou a redefinição da sua senha.</p>
+        <p>Clique no link abaixo para criar uma nova senha (válido por 30 minutos):</p>
+        <p><a href="${resetLink}">${resetLink}</a></p>
+        <p>Se não foi você, ignore este e-mail.</p>
+      `,
     });
 
-    res.json({ message: 'Se existir conta, enviaremos instruções.' });
+    res.json({ message: 'E-mail de recuperação enviado.' });
   } catch (err) {
-    console.error('Erro em /forgot:', err);
-    res.status(500).json({ error: 'Falha ao iniciar reset' });
+    console.error('Erro em forgot-password:', err);
+    res.status(500).json({ error: 'Erro ao solicitar recuperação' });
   }
 });
 
-// =======================
-// Reset de Senha (aplica nova senha)
-// =======================
-// routes/auth.js (trecho /register atualizado)
-router.post('/register', async (req, res) => {
+// --- Resetar senha ---
+router.post('/reset-password', async (req, res) => {
   try {
-    let { email, password } = req.body || {};
-    email = String(email || '').trim().toLowerCase();
-    password = String(password || '');
-
-    // validações simples
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Informe e-mail e senha.' });
-    }
-    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-    if (!emailOk) {
-      return res.status(400).json({ error: 'E-mail inválido.' });
-    }
-    if (password.length < 6) {
-      return res.status(400).json({ error: 'A senha deve ter pelo menos 6 caracteres.' });
+    const { token, password } = req.body;
+    if (!token || !password) {
+      return res.status(400).json({ error: 'Token e nova senha são obrigatórios.' });
     }
 
-    // se já existir, retorna 409 (conflito)
-    const existente = await User.findOne({ email }).lean();
-    if (existente) {
-      return res.status(409).json({ error: 'Usuário já existe.' });
+    // valida token
+    let payload;
+    try {
+      payload = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (err) {
+      return res.status(400).json({ error: 'Token inválido ou expirado.' });
     }
 
-    const novoUsuario = new User({ email, password });
-    await novoUsuario.save();
+    const usuario = await User.findById(payload.userId);
+    if (!usuario) return res.status(404).json({ error: 'Usuário não encontrado.' });
 
-    return res.status(201).json({ message: 'Usuário registrado com sucesso' });
+    // atualiza senha (o pre-save já faz hash)
+    usuario.password = password;
+    await usuario.save();
+
+    res.json({ message: 'Senha redefinida com sucesso!' });
   } catch (err) {
-    // trata índice único duplicado do Mongo
-    if (err?.code === 11000) {
-      return res.status(409).json({ error: 'Usuário já existe.' });
-    }
-    console.error('Erro no registro:', err);
-    return res.status(500).json({ error: 'Erro ao registrar usuário.' });
+    console.error('Erro em reset-password:', err);
+    res.status(500).json({ error: 'Erro ao redefinir senha' });
   }
 });
-
 
 export default router;
