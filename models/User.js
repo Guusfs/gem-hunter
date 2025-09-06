@@ -1,32 +1,23 @@
 // models/User.js
 import mongoose from 'mongoose';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';   // << trocar para bcryptjs
 
-const UserSchema = new mongoose.Schema(
-  {
-    email: {
-      type: String,
-      required: true,
-      unique: true,
-      lowercase: true,
-      trim: true,
-    },
-    password: {
-      type: String,
-      required: true,
-      minlength: 6,
-    },
-
-    // 🔐 Campos para reset de senha
-    resetPasswordTokenHash: { type: String, default: undefined },
-    resetPasswordExpires: { type: Date, default: undefined },
+const UserSchema = new mongoose.Schema({
+  email: {
+    type: String,
+    required: true,
+    unique: true,
+    lowercase: true,
+    trim: true,
   },
-  {
-    timestamps: true,
-  }
-);
+  password: {
+    type: String,
+    required: true,
+    minlength: 6,
+  },
+}, { timestamps: true });
 
-// 🔐 Hash automático antes de salvar (executa se a senha foi modificada)
+// hash antes de salvar
 UserSchema.pre('save', async function (next) {
   if (!this.isModified('password')) return next();
   try {
@@ -38,7 +29,7 @@ UserSchema.pre('save', async function (next) {
   }
 });
 
-// 🔍 Método para comparar senha
+// comparar senha
 UserSchema.methods.comparePassword = function (senhaDigitada) {
   return bcrypt.compare(senhaDigitada, this.password);
 };
