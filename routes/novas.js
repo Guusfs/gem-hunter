@@ -1,44 +1,35 @@
 // routes/novas.js
 import express from 'express';
 import { getMarketsPage, getUsdToBrl } from '../utils/coingecko.js';
-import { verifyToken } from '../middlewares/verifyToken.js';
+import { verifyToken } from '../middlewares/verifyToken.js'; // se a rota era pública, pode remover
 
 const router = express.Router();
 
-// GET /api/novas?limit=60
-router.get('/', /*verifyToken,*/ async (req, res) => {
+// GET /api/novas  -> devolve top N moedas "novas" da primeira página (ajuste seu critério)
+router.get('/', /* verifyToken, */ async (req, res) => {
   try {
-    const limit = Math.min( Number(req.query.limit) || 60, 200 );
+    const perPage = Math.min(Number(req.query.limit) || 60, 60);
+    const [markets, usdbrl] = await Promise.all([
+      getMarketsPage(1, perPage),   // 1 chamada com cache 30s
+      getUsdToBrl(),
+    ]);
 
-    // tenta CG; se 429, o util cai para CoinPaprika automaticamente
-    const mkts = await getMarketsPage({
-      vs: 'usd',
-      order: 'market_cap_asc',
-      perPage: limit,
-      page: 1
-    });
-
-    if (!Array.isArray(mkts) || mkts.length === 0) {
-      return res.json([]); // front mostrará "nenhuma cripto"
-    }
-
-    const usdbrl = await getUsdToBrl();
-
-    // normaliza p/ o front atual: id, name, symbol, image, current_price, brl_price, price_change_percentage_24h
-    const out = mkts.map(c => ({
+    // Ajuste esse filtro p/ "novas" conforme seu critério (data de listagem, market_cap baixo etc.)
+    const lista = (markets || []).map(c => ({
       id: c.id,
+      coingeckoId: c.id,
       name: c.name,
       symbol: c.symbol,
       image: c.image,
-      current_price: Number(c.current_price),
-      brl_price: Number(c.current_price) * usdbrl,
-      price_change_percentage_24h: Number(c.price_change_percentage_24h)
-    })).filter(x => Number.isFinite(x.current_price));
+      priceUsd: Number(c.current_price),
+      priceBrl: Number(c.current_price) * usdbrl,
+      price_change_percentage_24h: Number(c.price_change_percentage_24h),
+    }));
 
-    res.json(out);
+    res.json(lista);
   } catch (e) {
     console.error('[NOVAS] erro:', e);
-    res.json([]); // não quebra a UI
+    res.status(500).json({ error: 'Falha ao carregar novas moedas' });
   }
 });
 
