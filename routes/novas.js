@@ -1,39 +1,44 @@
 // routes/novas.js
 import express from 'express';
-import { getMarketsPage } from '../utils/coingecko.js';
+import { getMarketsPage, getUsdToBrl } from '../utils/coingecko.js';
+import { verifyToken } from '../middlewares/verifyToken.js';
 
 const router = express.Router();
 
-/**
- * Agora buscamos APENAS 1 página de markets (50 itens),
- * com cache de 30s e rate-limit no util.
- */
-router.get('/', async (_req, res) => {
+// GET /api/novas?limit=60
+router.get('/', /*verifyToken,*/ async (req, res) => {
   try {
-    const page = 1;      // fixo (evitar múltiplas chamadas/páginas)
-    const perPage = 50;  // suficiente p/ UI
-    const data = await getMarketsPage({
+    const limit = Math.min( Number(req.query.limit) || 60, 200 );
+
+    // tenta CG; se 429, o util cai para CoinPaprika automaticamente
+    const mkts = await getMarketsPage({
       vs: 'usd',
       order: 'market_cap_asc',
-      perPage,
-      page,
+      perPage: limit,
+      page: 1
     });
 
-    // normalize para o front (novas.js já espera esses campos)
-    const norm = (data || []).map(c => ({
+    if (!Array.isArray(mkts) || mkts.length === 0) {
+      return res.json([]); // front mostrará "nenhuma cripto"
+    }
+
+    const usdbrl = await getUsdToBrl();
+
+    // normaliza p/ o front atual: id, name, symbol, image, current_price, brl_price, price_change_percentage_24h
+    const out = mkts.map(c => ({
       id: c.id,
       name: c.name,
       symbol: c.symbol,
       image: c.image,
       current_price: Number(c.current_price),
-      brl_price: null, // front pode converter se quiser
-      price_change_percentage_24h: Number(c.price_change_percentage_24h),
-    }));
+      brl_price: Number(c.current_price) * usdbrl,
+      price_change_percentage_24h: Number(c.price_change_percentage_24h)
+    })).filter(x => Number.isFinite(x.current_price));
 
-    res.json(norm);
+    res.json(out);
   } catch (e) {
-    console.error('/api/novas error', e);
-    res.json([]); // nunca quebra a UI
+    console.error('[NOVAS] erro:', e);
+    res.json([]); // não quebra a UI
   }
 });
 

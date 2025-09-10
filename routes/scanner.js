@@ -1,35 +1,44 @@
 // routes/scanner.js
 import express from 'express';
-import { getMarketsPage } from '../utils/coingecko.js';
+import { getMarketsPage, getUsdToBrl } from '../utils/coingecko.js';
+import { verifyToken } from '../middlewares/verifyToken.js';
 
 const router = express.Router();
 
-/**
- * Scanner simplificado: uma chamada controlada,
- * cacheada e com rate-limit global via utils.
- */
-router.get('/', async (_req, res) => {
+// GET /api/scanner
+router.get('/', /*verifyToken,*/ async (req, res) => {
   try {
-    const data = await getMarketsPage({
+    const limit = Math.min(Number(req.query.limit) || 60, 200);
+
+    const mkts = await getMarketsPage({
       vs: 'usd',
       order: 'market_cap_asc',
-      perPage: 50,
-      page: 1,
+      perPage: limit,
+      page: 1
     });
 
-    const result = (data || []).map(c => ({
+    if (!Array.isArray(mkts) || mkts.length === 0) {
+      return res.json({ items: [] });
+    }
+
+    const usdbrl = await getUsdToBrl();
+
+    const items = mkts.map(c => ({
       id: c.id,
       name: c.name,
       symbol: c.symbol,
-      price: Number(c.current_price),
-      change24h: Number(c.price_change_percentage_24h),
       image: c.image,
-    }));
+      priceUsd: Number(c.current_price),
+      priceBrl: Number(c.current_price) * usdbrl,
+      change24h: Number(c.price_change_percentage_24h)
+    })).filter(x => Number.isFinite(x.priceUsd));
 
-    res.json({ items: result, ts: Date.now() });
+    // Se quiser, pode filtrar para “candidatas”: p.ex. variação <= -5% etc.
+    // const filtered = items.filter(x => Math.abs(x.change24h) >= 2);
+    res.json({ items });
   } catch (e) {
-    console.error('/api/scanner error', e);
-    res.json({ items: [], ts: Date.now() });
+    console.error('[SCANNER] erro:', e);
+    res.json({ items: [] });
   }
 });
 
