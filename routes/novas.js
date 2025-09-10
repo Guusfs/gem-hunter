@@ -1,89 +1,86 @@
 // routes/novas.js
 import express from 'express';
-import { verifyToken } from '../middlewares/verifyToken.js';
-import { slugifyForCoingecko, getUsdPrices, getUsdToBrl } from '../utils/coingecko.js';
+import { getUsdToBrl } from '../utils/coinGecko.js';
 
 const router = express.Router();
 
-// Helper genérico com retry
-async function fetchJson(url, { headers = {}, ...opts } = {}, retries = 2) {
-  const h = {
-    accept: 'application/json',
-    ...headers,
+// cache em memória (30s)
+const TTL_MS = 30_000;
+let cache = { ts: 0, data: [] };
+
+function mapCoin(row, usdbrl) {
+  const priceUsd = Number(row.current_price);
+  return {
+    id: row.id,
+    coingeckoId: row.id,
+    name: row.name,
+    symbol: row.symbol,
+    image: row.image,
+    priceUsd,
+    priceBrl: Number.isFinite(priceUsd) ? priceUsd * usdbrl : null,
+    price_change_percentage_24h: Number(row.price_change_percentage_24h),
   };
+}
+
+async function fetchJsonRetry(url, { retries = 2, backoffMs = 800 } = {}) {
   for (let i = 0; i <= retries; i++) {
-    const res = await fetch(url, { ...opts, headers: h });
-    if (res.ok) return res.json();
-    if (res.status === 429 && i < retries) {
-      await new Promise(r => setTimeout(r, 800 * (i + 1)));
+    const resp = await fetch(url);
+    if (resp.ok) return resp.json();
+    // 429: espera incremental e tenta de novo
+    if (resp.status === 429 && i < retries) {
+      await new Promise(r => setTimeout(r, backoffMs * (i + 1)));
       continue;
     }
-    try {
-      const text = await res.text();
-      console.warn('[CoinGecko]', res.status, url, text?.slice?.(0, 160));
-    } catch {}
-    return null;
+    const txt = await resp.text().catch(() => '');
+    throw new Error(`[HTTP ${resp.status}] ${txt || url}`);
   }
+  return [];
 }
 
-// markets por ranking
-async function getMarkets({ vs = 'usd', per_page = 50, page = 1, ids = [] } = {}) {
-  const base = 'https://api.coingecko.com/api/v3/coins/markets';
-  const qs = new URLSearchParams({
-    vs_currency: vs,
-    order: 'market_cap_asc',
-    per_page: String(per_page),
-    page: String(page),
-    sparkline: 'false',
-    price_change_percentage: '24h',
-  });
-  if (ids?.length) qs.set('ids', ids.join(','));
-  const url = `${base}?${qs.toString()}`;
-  const data = await fetchJson(url);
-  return Array.isArray(data) ? data : [];
-}
-
-async function getTrendingIds() {
-  const j = await fetchJson('https://api.coingecko.com/api/v3/search/trending');
-  const list = j?.coins || [];
-  return list.map(c => c?.item?.id).filter(Boolean);
-}
-
-router.get('/', verifyToken, async (req, res) => {
+/**
+ * GET /api/novas?limit=60
+ * Lista moedas do CoinGecko já com USD e BRL.
+ * Responde do cache por 30s para reduzir chamadas externas.
+ */
+router.get('/', async (req, res) => {
   try {
-    const limit = Math.min(Number(req.query.limit ?? 24), 100);
+    const limit = Math.max(1, Math.min(200, Number(req.query.limit) || 60));
+
+    // serve do cache se válido
+    if (cache.data.length && Date.now() - cache.ts < TTL_MS) {
+      return res.json(cache.data.slice(0, limit));
+    }
+
+    // USD->BRL
     const usdbrl = await getUsdToBrl();
 
-    // 1) tenta markets “normais”
-    let markets = await getMarkets({ per_page: Math.max(limit, 50), page: 1 });
+    // uma chamada já cobre até 100; se quiser mais, junte páginas
+    const url1 =
+      'https://api.coingecko.com/api/v3/coins/markets'
+      + '?vs_currency=usd&order=market_cap_desc&per_page=100&page=1'
+      + '&sparkline=false&price_change_percentage=24h';
 
-    // 2) fallback: trending
-    if (!markets.length) {
-      const ids = await getTrendingIds();
-      if (ids.length) markets = await getMarkets({ ids, per_page: ids.length });
+    const rows1 = await fetchJsonRetry(url1);
+    let rows = rows1;
+
+    if (limit > 100) {
+      const url2 =
+        'https://api.coingecko.com/api/v3/coins/markets'
+        + '?vs_currency=usd&order=market_cap_desc&per_page=100&page=2'
+        + '&sparkline=false&price_change_percentage=24h';
+      const rows2 = await fetchJsonRetry(url2);
+      rows = rows1.concat(rows2);
     }
 
-    // 3) fallback final: top cap (garante algo)
-    if (!markets.length) {
-      markets = await getMarkets({ per_page: Math.max(limit, 20), page: 1 });
-    }
+    const mapped = rows.map(r => mapCoin(r, usdbrl));
 
-    // normaliza e limita — e já devolve USD e BRL
-    const out = markets.slice(0, limit).map(c => ({
-      id: c.id,
-      coingeckoId: c.id,
-      name: c.name,
-      symbol: c.symbol,
-      image: c.image,
-      priceUsd: Number(c.current_price),
-      priceBrl: Number(c.current_price) * usdbrl,
-      price_change_percentage_24h: Number(c.price_change_percentage_24h),
-    }));
-
-    return res.json(out);
+    cache = { ts: Date.now(), data: mapped };
+    res.json(mapped.slice(0, limit));
   } catch (err) {
-    console.error('Erro ao buscar criptos recentes:', err);
-    return res.json([]); // fallback seguro
+    console.warn('[NOVAS] falhou:', err.message);
+    // fallback: devolve cache velho se existir
+    if (cache.data.length) return res.json(cache.data.slice(0, 60));
+    res.status(502).json({ error: 'Falha ao consultar provedor de preços' });
   }
 });
 
