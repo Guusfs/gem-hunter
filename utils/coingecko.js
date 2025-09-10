@@ -1,58 +1,84 @@
 // utils/coingecko.js
-// Cache + dedupe + rate-limit p/ CoinGecko (sem libs externas)
+// Gate global + backoff + cache + dedupe
 
-const PRICE_TTL_MS   = 30_000;   // 30s
-const MARKET_TTL_MS  = 30_000;   // 30s
-const FX_TTL_MS      = 600_000;  // 10min
-const MAX_PER_MIN    = 40;       // margem segura (< 50/min do plano free)
+const TTL_MS = 60_000;         // 60s cache
+const FX_TTL_MS = 600_000;     // 10min FX
+const SAFE_CAP_PER_MIN = 10;   // cap global conservador (<< 50/min CG free)
 
-const priceCache   = new Map();  // key: ids sorted => {v, t}
-const marketCache  = new Map();  // key: `page|perPage` => {v, t}
-const fxCache      = new Map();  // key: 'USD/BRL' => {v, t}
-const inflight     = new Map();  // key: url => Promise   (de-dupe)
+// ---- caches
+const priceCache = new Map();  // key(ids ordenados) -> { v, t }
+let marketSnap = { v: [], t: 0 }; // snapshot de mercado (página 1)
 
-// rate-limit de 1min (janela deslizante)
+// ---- inflight (dedupe por URL)
+const inflight = new Map();
+
+// ---- rate limit/buffer global
 const requestTimes = [];
+let backoffUntil = 0;
+let lastAnyFetchAt = 0;
+
+function now() { return Date.now(); }
+
 function withinMinute() {
-  const now = Date.now();
-  while (requestTimes.length && now - requestTimes[0] > 60_000) requestTimes.shift();
+  const n = now();
+  while (requestTimes.length && n - requestTimes[0] > 60_000) requestTimes.shift();
   return requestTimes.length;
 }
-async function rateLimitGate() {
-  while (withinMinute() >= MAX_PER_MIN) {
-    await new Promise(r => setTimeout(r, 200)); // espera 200ms e re-checa
-  }
-  requestTimes.push(Date.now());
+
+async function globalGate() {
+  const t = now();
+
+  // backoff ativo? só servir cache
+  if (t < backoffUntil) throw new Error('GATE_BACKOFF');
+
+  // espaçamento mínimo rígido entre quaisquer fetches (60s)
+  if (t - lastAnyFetchAt < TTL_MS) throw new Error('GATE_COOLDOWN');
+
+  // cap por minuto
+  if (withinMinute() >= SAFE_CAP_PER_MIN) throw new Error('GATE_CAP');
+
+  requestTimes.push(t);
+  lastAnyFetchAt = t;
 }
 
-async function fetchJson(url, { retries = 2, backoffMs = 600 } = {}) {
+async function fetchJson(url, { retries = 0 } = {}) {
   if (inflight.has(url)) return inflight.get(url);
   const p = (async () => {
     for (let i = 0; i <= retries; i++) {
-      await rateLimitGate();
+      try {
+        await globalGate(); // pode lançar GATE_* -> o caller decide servir cache
+      } catch (gerr) {
+        // propaguemos a razão de gate p/ o caller
+        throw gerr;
+      }
+
       const resp = await fetch(url);
-      const ct = resp.headers.get('content-type') || '';
       if (resp.ok) {
+        const ct = resp.headers.get('content-type') || '';
         return ct.includes('application/json') ? resp.json() : {};
       }
-      // 429 => backoff exponencial leve
-      if (resp.status === 429 && i < retries) {
-        await new Promise(r => setTimeout(r, backoffMs * (i + 1)));
-        continue;
+
+      // 429 => ativa backoff e sai
+      if (resp.status === 429) {
+        const waitMs = 180_000; // 3 minutos
+        backoffUntil = now() + waitMs;
+        throw new Error('HTTP_429');
       }
-      // outros erros: tenta ler texto p/ log
+
+      // outros erros: sem retry aqui
       const txt = await resp.text().catch(() => '');
       throw new Error(`[HTTP ${resp.status}] ${txt || url}`);
     }
     return {};
   })().finally(() => inflight.delete(url));
+
   inflight.set(url, p);
   return p;
 }
 
-/** Normaliza IDs/símbolos para slug de CoinGecko */
-export function slugifyForCoingecko(nameOrSymbol = '') {
-  return String(nameOrSymbol)
+// Slug util
+export function slugifyForCoingecko(s = '') {
+  return String(s)
     .toLowerCase()
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9\s-]/g, '')
@@ -61,62 +87,74 @@ export function slugifyForCoingecko(nameOrSymbol = '') {
     .replace(/-+/g, '-');
 }
 
-/** Preços USD por id[] (cache 30s) */
+// ===== Mercados (snapshot único) =====
+export async function getMarketsSnapshot(perPage = 50) {
+  const fresh = now() - marketSnap.t < TTL_MS;
+  if (fresh && marketSnap.v.length) return marketSnap.v;
+
+  const url =
+    `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd` +
+    `&order=market_cap_desc&per_page=${perPage}&page=1&sparkline=false&price_change_percentage=24h`;
+
+  try {
+    const data = await fetchJson(url);
+    marketSnap = { v: Array.isArray(data) ? data : [], t: now() };
+    return marketSnap.v;
+  } catch (e) {
+    // Em qualquer erro de gate/backoff/HTTP, servimos o cache que tivermos
+    if (e.message === 'GATE_BACKOFF' || e.message === 'GATE_COOLDOWN' || e.message === 'GATE_CAP' || e.message === 'HTTP_429') {
+      return marketSnap.v; // possivelmente “stale”, mas existente
+    }
+    console.warn('[CoinGecko] getMarketsSnapshot falhou:', e.message);
+    return marketSnap.v;
+  }
+}
+
+// ===== Preços USD (ids[]) =====
 export async function getUsdPrices(ids) {
   const unique = Array.from(new Set((ids || []).filter(Boolean)));
   if (unique.length === 0) return {};
 
   const cacheKey = unique.sort().join(',');
   const hit = priceCache.get(cacheKey);
-  if (hit && Date.now() - hit.t < PRICE_TTL_MS) return hit.v;
+  const fresh = hit && now() - hit.t < TTL_MS;
+  if (fresh) return hit.v;
 
   const url = `https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(unique.join(','))}&vs_currencies=usd`;
   try {
     const data = await fetchJson(url);
-    priceCache.set(cacheKey, { v: data, t: Date.now() });
+    priceCache.set(cacheKey, { v: data, t: now() });
     return data;
   } catch (e) {
+    if (e.message === 'GATE_BACKOFF' || e.message === 'GATE_COOLDOWN' || e.message === 'GATE_CAP' || e.message === 'HTTP_429') {
+      return hit?.v || {}; // serve cache antigo
+    }
     console.warn('[CoinGecko] getUsdPrices falhou:', e.message);
     return hit?.v || {};
   }
 }
 
-/** Mercado (top moedas) por página (cache 30s) */
-export async function getMarketsPage(page = 1, perPage = 50) {
-  const key = `${page}|${perPage}`;
-  const hit = marketCache.get(key);
-  if (hit && Date.now() - hit.t < MARKET_TTL_MS) return hit.v;
-
-  const url =
-    `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd` +
-    `&order=market_cap_desc&per_page=${perPage}&page=${page}&sparkline=false&price_change_percentage=24h`;
-
-  try {
-    const data = await fetchJson(url);
-    marketCache.set(key, { v: data, t: Date.now() });
-    return data;
-  } catch (e) {
-    console.warn('[CoinGecko] getMarketsPage falhou:', e.message);
-    return hit?.v || [];
-  }
-}
-
-/** USD->BRL (cache 10min) usando open.er-api (sem CORS) */
+// ===== USD -> BRL (FX) =====
+const fxCache = new Map();
 export async function getUsdToBrl() {
-  const key = 'USD/BRL';
-  const hit = fxCache.get(key);
-  if (hit && Date.now() - hit.t < FX_TTL_MS) return hit.v;
+  const k = 'USD/BRL';
+  const hit = fxCache.get(k);
+  if (hit && now() - hit.t < FX_TTL_MS) return hit.v;
 
+  // FX não conta p/ limite da CoinGecko; mas mantemos o cooldown global
   const url = 'https://open.er-api.com/v6/latest/USD';
   try {
-    const data = await fetchJson(url);
+    // não passa pelo globalGate para não interferir no cooldown CG
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error('FX_HTTP');
+    const data = await resp.json();
     const brl = Number(data?.rates?.BRL);
     if (Number.isFinite(brl)) {
-      fxCache.set(key, { v: brl, t: Date.now() });
+      fxCache.set(k, { v: brl, t: now() });
       return brl;
     }
   } catch (e) {
     console.warn('[FX] USD->BRL falhou:', e.message);
   }
-  return 1; // fallback
+  return hit?.v ?? 1;
 }

@@ -1,21 +1,17 @@
-// routes/novas.js
 import express from 'express';
-import { getMarketsPage, getUsdToBrl } from '../utils/coingecko.js';
-import { verifyToken } from '../middlewares/verifyToken.js'; // se a rota era pública, pode remover
+import { getMarketsSnapshot, getUsdToBrl } from '../utils/coingecko.js';
 
 const router = express.Router();
 
-// GET /api/novas  -> devolve top N moedas "novas" da primeira página (ajuste seu critério)
-router.get('/', /* verifyToken, */ async (req, res) => {
+router.get('/', async (req, res) => {
   try {
-    const perPage = Math.min(Number(req.query.limit) || 60, 60);
-    const [markets, usdbrl] = await Promise.all([
-      getMarketsPage(1, perPage),   // 1 chamada com cache 30s
+    const limit = Math.min(Number(req.query.limit) || 60, 60);
+    const [snap, usdbrl] = await Promise.all([
+      getMarketsSnapshot(limit), // 1 snapshot compartilhado p/ todos
       getUsdToBrl(),
     ]);
 
-    // Ajuste esse filtro p/ "novas" conforme seu critério (data de listagem, market_cap baixo etc.)
-    const lista = (markets || []).map(c => ({
+    const lista = (snap || []).slice(0, limit).map(c => ({
       id: c.id,
       coingeckoId: c.id,
       name: c.name,
@@ -29,7 +25,7 @@ router.get('/', /* verifyToken, */ async (req, res) => {
     res.json(lista);
   } catch (e) {
     console.error('[NOVAS] erro:', e);
-    res.status(500).json({ error: 'Falha ao carregar novas moedas' });
+    res.status(200).json([]); // devolve vazio p/ não quebrar UI
   }
 });
 
