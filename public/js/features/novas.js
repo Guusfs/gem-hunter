@@ -1,4 +1,8 @@
 // public/js/features/novas.js
+// Lista "novas criptos" (na prática: top market com cache no backend)
+// - Usa /api/novas?limit=60
+// - Mantém paginação local e botões "Comprei" / "Não tenho interesse"
+
 let pagina = 1;
 const POR_PAGINA = 12;
 let cache = [];
@@ -8,6 +12,7 @@ function token() {
   return localStorage.getItem('token') || sessionStorage.getItem('token') || '';
 }
 
+/* ===== Ignorados (persistência local) ===== */
 function getIgnorados() {
   try { return JSON.parse(localStorage.getItem('novas_ignorados') || '[]'); } catch { return []; }
 }
@@ -21,17 +26,24 @@ function isIgnorado(id) {
   return id ? getIgnorados().includes(String(id)) : false;
 }
 
+/* ===== Utils ===== */
 function fmtUSD(v) {
   const n = Number(v);
   if (!Number.isFinite(n)) return '$0.000000';
-  try { return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 6 }).format(n); }
-  catch { return `$${n.toFixed(6)}`; }
+  try {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 6 }).format(n);
+  } catch {
+    return `$${n.toFixed(6)}`;
+  }
 }
 function fmtBRL(v) {
   const n = Number(v);
   if (!Number.isFinite(n)) return 'R$ 0,00';
-  try { return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n); }
-  catch { return `R$ ${n.toFixed(2)}`; }
+  try {
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n);
+  } catch {
+    return `R$ ${n.toFixed(2)}`;
+  }
 }
 
 function moedaValida(c) {
@@ -52,8 +64,8 @@ function normalizar(lista) {
       name: c.name,
       symbol: c.symbol,
       image: c.image,
-      current_price: Number(c.current_price ?? c.priceUsd),
-      brl_price: Number(c.brl_price ?? c.priceBrl),
+      current_price: Number(c.current_price ?? c.priceUsd), // USD
+      brl_price: Number(c.brl_price ?? c.priceBrl),         // BRL
       price_change_percentage_24h: Number(c.price_change_percentage_24h),
     };
     if (moedaValida(obj) && !map.has(obj.id)) map.set(obj.id, obj);
@@ -65,6 +77,7 @@ function visiveis() {
   return cache.filter(c => !isIgnorado(c.id || c.coingeckoId || c.symbol || c.name));
 }
 
+/* ===== Backend: histórico ===== */
 async function postHistoricoCompra(coin, price) {
   const tk = token();
   if (!tk) return;
@@ -100,7 +113,7 @@ async function comprarCoin(coin, cardEl) {
         name: coin.name,
         symbol: coin.symbol,
         image: coin.image,
-        priceAtPurchase: preco,
+        priceAtPurchase: preco,               // guardamos compra em USD
         coingeckoId: coin.id || coin.coingeckoId,
       }),
     });
@@ -122,6 +135,7 @@ async function comprarCoin(coin, cardEl) {
   }
 }
 
+/* ===== UI ===== */
 function renderizarLista() {
   const lista = document.getElementById('novas-lista');
   const btnMais = document.getElementById('btn-carregar-mais');
@@ -149,7 +163,8 @@ function renderizarLista() {
     card.style.maxWidth = '360px';
     card.innerHTML = `
       <div style="display:flex; gap:12px; justify-content:center; align-items:center; margin-bottom:6px;">
-        <img src="${coin.image}" alt="${coin.name}" width="56" height="56" style="border-radius:50%; background:#fff; border:1px solid #00f0ff; box-shadow:0 0 10px #00f0ff" />
+        <img src="${coin.image}" alt="${coin.name}" width="56" height="56"
+             style="border-radius:50%; background:#fff; border:1px solid #00f0ff; box-shadow:0 0 10px #00f0ff" />
         <h3 style="margin:0; font-size:1.05rem;">${coin.name} (${String(coin.symbol).toUpperCase()})</h3>
       </div>
 
@@ -188,6 +203,7 @@ function renderizarLista() {
   if (fimMsg) fimMsg.style.display = temMais ? 'none' : (itens.length ? 'none' : 'block');
 }
 
+/* ===== Backend ===== */
 async function carregarDoServidor() {
   const lista = document.getElementById('novas-lista');
   if (cache.length === 0 && lista) lista.innerHTML = '<p>Carregando...</p>';
@@ -195,18 +211,20 @@ async function carregarDoServidor() {
   try {
     const headers = token() ? { Authorization: `Bearer ${token()}` } : undefined;
     const r = await fetch('/api/novas?limit=60', { headers });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const data = await r.json();
 
-    const saneadas = normalizar(Array.isArray(data) ? data : []);
-    cache = saneadas;
+    cache = normalizar(Array.isArray(data) ? data : []);
     ultimaAtualizacao = Date.now();
   } catch (e) {
     console.error('Falha ao carregar /api/novas:', e);
+    const lista = document.getElementById('novas-lista');
+    if (lista) lista.innerHTML = '<p style="color:#ccc;">🥲 Sem mais sugestões no momento.</p>';
   }
 }
 
 export async function carregarNovasCriptos() {
-  const precisa = cache.length === 0 || (Date.now() - ultimaAtualizacao) > 30_000; // 30s
+  const precisa = cache.length === 0 || (Date.now() - ultimaAtualizacao) > 60_000;
   if (precisa) {
     await carregarDoServidor();
     pagina = 1;
@@ -217,7 +235,6 @@ export async function carregarNovasCriptos() {
   if (btnMais && !btnMais._bound) {
     btnMais._bound = true;
     btnMais.addEventListener('click', async () => {
-      await carregarDoServidor();
       pagina += 1;
       const totalVisiveis = visiveis().length;
       const maxPaginas = Math.max(1, Math.ceil(totalVisiveis / POR_PAGINA));
@@ -226,8 +243,3 @@ export async function carregarNovasCriptos() {
     });
   }
 }
-
-// Atualização automática a cada 30 segundos
-setInterval(() => {
-  carregarNovasCriptos();
-}, 30_000);
