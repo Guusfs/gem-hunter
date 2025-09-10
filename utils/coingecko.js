@@ -1,25 +1,115 @@
 // utils/coingecko.js
-// Node 18+ já tem fetch nativo
-// Cache simples em memória + retry com backoff e fallback do último valor ("stale-while-revalidate")
+// Node 18+ (fetch nativo)
 
-/* ======================== Cache helpers ======================== */
-const caches = {
-  markets: new Map(),   // key -> { v, t }
-  prices:  new Map(),
-  fx:      new Map(),
-};
+const marketsCache = new Map(); // key -> { v, t }
+const simpleCache  = new Map(); // key -> { v, t }
+const fxCache      = new Map(); // 'USD/BRL' -> { v, t }
 
-function getCached(map, key, ttlMs) {
+const TTL_MARKETS_MS = 30_000;   // 30s
+const TTL_SIMPLE_MS  = 60_000;   // 60s
+const TTL_FX_MS      = 600_000;  // 10min
+
+let nextAllowedAt = 0;           // rate-limit global (1 req / 30s)
+let inFlight = null;             // evita paralelismo
+
+function getCached(map, key, ttl) {
   const hit = map.get(key);
   if (!hit) return null;
-  if (Date.now() - hit.t > ttlMs) return null;
+  if (Date.now() - hit.t > ttl) return null;
   return hit.v;
 }
 function setCached(map, key, v) {
   map.set(key, { v, t: Date.now() });
 }
 
-/* ======================== Utils ======================== */
+async function guardedFetchJson(url) {
+  // rate-limit: 1 chamada a cada 30s
+  const now = Date.now();
+  const wait = Math.max(0, nextAllowedAt - now);
+
+  // Se já existe uma chamada em curso, aguarde ela terminar (coalescing)
+  if (inFlight) {
+    try { return await inFlight; } finally { /* noop */ }
+  }
+
+  // Se precisa aguardar, programe a espera
+  if (wait > 0) {
+    await new Promise(r => setTimeout(r, wait));
+  }
+
+  // Dispare a chamada única
+  inFlight = (async () => {
+    let resp;
+    try {
+      resp = await fetch(url, { headers: { 'accept': 'application/json' } });
+      // programe o próximo slot
+      nextAllowedAt = Date.now() + 30_000;
+
+      // Se 429, NÃO estoure erro para os chamadores — eles usarão cache
+      if (resp.status === 429) {
+        const txt = await resp.text().catch(() => '');
+        console.warn('[CoinGecko] 429 em', url, txt.slice(0, 120));
+        return { __429: true };
+      }
+      if (!resp.ok) {
+        const txt = await resp.text().catch(() => '');
+        throw new Error(`[HTTP ${resp.status}] ${txt || url}`);
+      }
+      const ct = resp.headers.get('content-type') || '';
+      return ct.includes('application/json') ? resp.json() : {};
+    } finally {
+      inFlight = null;
+    }
+  })();
+
+  return inFlight;
+}
+
+/** Lista de moedas com preço/24h (UMA página apenas) */
+export async function getMarketsPage({ vs = 'usd', order = 'market_cap_asc', perPage = 50, page = 1 } = {}) {
+  const key = `mk:${vs}:${order}:${perPage}:${page}`;
+  const cached = getCached(marketsCache, key, TTL_MARKETS_MS);
+  if (cached) return cached;
+
+  const url =
+    `https://api.coingecko.com/api/v3/coins/markets?vs_currency=${encodeURIComponent(vs)}` +
+    `&order=${encodeURIComponent(order)}` +
+    `&per_page=${encodeURIComponent(perPage)}` +
+    `&page=${encodeURIComponent(page)}` +
+    `&sparkline=false&price_change_percentage=24h`;
+
+  const data = await guardedFetchJson(url);
+
+  // Se tomou 429 ou falhou: devolva último cache (se houver) ou []
+  if (!data || data.__429) {
+    return cached || [];
+  }
+
+  setCached(marketsCache, key, data);
+  return data;
+}
+
+/** Preços simples em USD */
+export async function getUsdPrices(ids) {
+  const unique = Array.from(new Set((ids || []).filter(Boolean)));
+  if (!unique.length) return {};
+
+  const key = `sp:${unique.sort().join(',')}`;
+  const cached = getCached(simpleCache, key, TTL_SIMPLE_MS);
+  if (cached) return cached;
+
+  const url =
+    `https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(unique.join(','))}&vs_currencies=usd`;
+
+  const data = await guardedFetchJson(url);
+  if (!data || data.__429) {
+    return cached || {};
+  }
+
+  setCached(simpleCache, key, data);
+  return data;
+}
+
 export function slugifyForCoingecko(nameOrSymbol = '') {
   return String(nameOrSymbol)
     .toLowerCase()
@@ -30,150 +120,22 @@ export function slugifyForCoingecko(nameOrSymbol = '') {
     .replace(/-+/g, '-');
 }
 
-async function sleep(ms) {
-  return new Promise(r => setTimeout(r, ms));
-}
-
-/**
- * fetch JSON com retry/backoff para 429/5xx.
- * Em erro final, lança exceção.
- */
-async function fetchJsonRetry(url, { retries = 2, backoffMs = 700, signal } = {}) {
-  let lastErr;
-  for (let i = 0; i <= retries; i++) {
-    try {
-      const resp = await fetch(url, { signal });
-      const ct = resp.headers.get('content-type') || '';
-      if (resp.ok) {
-        return ct.includes('application/json') ? resp.json() : {};
-      }
-      // Se for 429, espera e tenta de novo
-      if (resp.status === 429 && i < retries) {
-        await sleep(backoffMs * (i + 1));
-        continue;
-      }
-      // Demais erros: captura e tenta novamente se tiver retries
-      const txt = await resp.text().catch(() => '');
-      lastErr = new Error(`[HTTP ${resp.status}] ${txt || url}`);
-    } catch (e) {
-      lastErr = e;
-    }
-    if (i < retries) await sleep(backoffMs * (i + 1));
-  }
-  throw lastErr || new Error('Request failed');
-}
-
-/* ======================== APIs CoinGecko ======================== */
-
-/**
- * Lista de mercados (para "Novas Criptos") com cache de 30s por combinação de parâmetros.
- * Exemplo de uso na rota: getMarketsCached({ page:1, perPage:50, vsCurrency:'usd' })
- */
-export async function getMarketsCached({
-  page = 1,
-  perPage = 50,
-  vsCurrency = 'usd',
-  order = 'market_cap_asc',
-  sparkline = false,
-  priceChangePerc = '24h',
-} = {}) {
-  const key = `markets:vs=${vsCurrency}:page=${page}:per=${perPage}:order=${order}:spark=${sparkline}:pc=${priceChangePerc}`;
-  const TTL_MS = 30 * 1000;
-
-  // hit de cache
-  const cached = getCached(caches.markets, key, TTL_MS);
-  if (cached) return cached;
-
-  const url =
-    `https://api.coingecko.com/api/v3/coins/markets` +
-    `?vs_currency=${encodeURIComponent(vsCurrency)}` +
-    `&order=${encodeURIComponent(order)}` +
-    `&per_page=${encodeURIComponent(perPage)}` +
-    `&page=${encodeURIComponent(page)}` +
-    `&sparkline=${sparkline ? 'true' : 'false'}` +
-    `&price_change_percentage=${encodeURIComponent(priceChangePerc)}`;
-
-  try {
-    const data = await fetchJsonRetry(url, { retries: 2, backoffMs: 800 });
-    setCached(caches.markets, key, data);
-    return data;
-  } catch (e) {
-    // fallback: retorna o último valor "stale" se existir
-    const stale = caches.markets.get(key)?.v;
-    if (stale) return stale;
-    console.warn('[CoinGecko][markets] falha:', e.message);
-    return [];
-  }
-}
-
-/**
- * Preços simples em USD, com cache de 60s.
- * ids: array de slugs do CoinGecko (ex.: ['bitcoin','solana'])
- * retorna: { bitcoin: { usd: 12345.67 }, ... }
- */
-export async function getUsdPrices(ids) {
-  const arr = Array.from(new Set((ids || []).filter(Boolean)));
-  if (arr.length === 0) return {};
-
-  const key = arr.sort().join(',');
-  const TTL_MS = 60 * 1000;
-
-  const cached = getCached(caches.prices, key, TTL_MS);
-  if (cached) return cached;
-
-  const url =
-    `https://api.coingecko.com/api/v3/simple/price` +
-    `?ids=${encodeURIComponent(key)}` +
-    `&vs_currencies=usd`;
-
-  try {
-    const data = await fetchJsonRetry(url, { retries: 2, backoffMs: 800 });
-    setCached(caches.prices, key, data);
-    return data;
-  } catch (e) {
-    const stale = caches.prices.get(key)?.v;
-    if (stale) return stale;
-    console.warn('[CoinGecko][prices] falha:', e.message);
-    return {};
-  }
-}
-
-/**
- * Câmbio USD→BRL com cache de 120s.
- * Retorna número (ex.: 5.23). Se falhar, tenta último valor.
- */
+/** USD->BRL por fonte pública alternativa (sem token) */
 export async function getUsdToBrl() {
-  const key = 'USD/BRL';
-  const TTL_MS = 120 * 1000;
-
-  const cached = getCached(caches.fx, key, TTL_MS);
+  const cached = getCached(fxCache, 'USD/BRL', TTL_FX_MS);
   if (cached) return cached;
 
-  // fonte 1: open.er-api.com (estável e sem CORS para backend)
-  const url = 'https://open.er-api.com/v6/latest/USD';
-
   try {
-    const data = await fetchJsonRetry(url, { retries: 2, backoffMs: 700 });
-    const brl = Number(data?.rates?.BRL);
+    const r = await fetch('https://open.er-api.com/v6/latest/USD');
+    const j = await r.json();
+    const brl = Number(j?.rates?.BRL);
     if (Number.isFinite(brl)) {
-      setCached(caches.fx, key, brl);
+      setCached(fxCache, 'USD/BRL', brl);
       return brl;
     }
-    // fallback (CoinGecko simple price para "usd" em BRL)
-    const cg = await fetchJsonRetry(
-      'https://api.coingecko.com/api/v3/simple/price?ids=usd&vs_currencies=brl',
-      { retries: 1, backoffMs: 700 }
-    );
-    const cgBrl = Number(cg?.usd?.brl);
-    if (Number.isFinite(cgBrl)) {
-      setCached(caches.fx, key, cgBrl);
-      return cgBrl;
-    }
   } catch (e) {
-    // Tenta fallback antigo de cache
-    const stale = caches.fx.get(key)?.v;
-    if (Number.isFinite(stale)) return stale;
-    console.warn('[FX] USD->BRL falhou:', e.message);
+    console.warn('[FX] fallback USD->BRL', e.message);
   }
-  return 1; // último último fallback
+  // fallback sem travar a UI
+  return cached || 5;
 }
