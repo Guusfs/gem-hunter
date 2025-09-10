@@ -14,7 +14,6 @@ export async function carregarSentimentos() {
 
     const { sentimentoAtual, historico, sentimentoSocial } = data;
 
-    // Exibir os valores no HTML
     container.innerHTML = `
       <div class="neon-card">
         <i class="fas fa-smile-beam"></i>
@@ -85,3 +84,8 @@ function desenharGraficos(historico) {
     }
   });
 }
+
+// Atualizar automaticamente a cada 30 segundos
+setInterval(() => {
+  carregarSentimentos();
+}, 30_000);

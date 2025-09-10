@@ -1,8 +1,4 @@
 // public/js/features/novas.js
-// Mantém o layout (USD/BRL, 24h, botões).
-// "Comprei" remove da lista e registra no portfólio + histórico.
-// "Mostrar mais" recarrega garantindo moedas realmente existentes.
-
 let pagina = 1;
 const POR_PAGINA = 12;
 let cache = [];
@@ -12,7 +8,6 @@ function token() {
   return localStorage.getItem('token') || sessionStorage.getItem('token') || '';
 }
 
-/* ===== Ignorados (persistência local) ===== */
 function getIgnorados() {
   try { return JSON.parse(localStorage.getItem('novas_ignorados') || '[]'); } catch { return []; }
 }
@@ -26,7 +21,6 @@ function isIgnorado(id) {
   return id ? getIgnorados().includes(String(id)) : false;
 }
 
-/* ===== Utils ===== */
 function fmtUSD(v) {
   const n = Number(v);
   if (!Number.isFinite(n)) return '$0.000000';
@@ -58,7 +52,6 @@ function normalizar(lista) {
       name: c.name,
       symbol: c.symbol,
       image: c.image,
-      // API /api/novas já traz priceUsd/priceBrl; manter compatibilidade antiga:
       current_price: Number(c.current_price ?? c.priceUsd),
       brl_price: Number(c.brl_price ?? c.priceBrl),
       price_change_percentage_24h: Number(c.price_change_percentage_24h),
@@ -72,7 +65,6 @@ function visiveis() {
   return cache.filter(c => !isIgnorado(c.id || c.coingeckoId || c.symbol || c.name));
 }
 
-/* ===== Backend: histórico ===== */
 async function postHistoricoCompra(coin, price) {
   const tk = token();
   if (!tk) return;
@@ -108,7 +100,7 @@ async function comprarCoin(coin, cardEl) {
         name: coin.name,
         symbol: coin.symbol,
         image: coin.image,
-        priceAtPurchase: preco,               // guardamos compra em USD
+        priceAtPurchase: preco,
         coingeckoId: coin.id || coin.coingeckoId,
       }),
     });
@@ -130,7 +122,6 @@ async function comprarCoin(coin, cardEl) {
   }
 }
 
-/* ===== UI ===== */
 function renderizarLista() {
   const lista = document.getElementById('novas-lista');
   const btnMais = document.getElementById('btn-carregar-mais');
@@ -197,7 +188,6 @@ function renderizarLista() {
   if (fimMsg) fimMsg.style.display = temMais ? 'none' : (itens.length ? 'none' : 'block');
 }
 
-/* ===== Backend ===== */
 async function carregarDoServidor() {
   const lista = document.getElementById('novas-lista');
   if (cache.length === 0 && lista) lista.innerHTML = '<p>Carregando...</p>';
@@ -216,7 +206,7 @@ async function carregarDoServidor() {
 }
 
 export async function carregarNovasCriptos() {
-  const precisa = cache.length === 0 || (Date.now() - ultimaAtualizacao) > 60_000;
+  const precisa = cache.length === 0 || (Date.now() - ultimaAtualizacao) > 30_000; // 30s
   if (precisa) {
     await carregarDoServidor();
     pagina = 1;
@@ -236,3 +226,8 @@ export async function carregarNovasCriptos() {
     });
   }
 }
+
+// Atualização automática a cada 30 segundos
+setInterval(() => {
+  carregarNovasCriptos();
+}, 30_000);
