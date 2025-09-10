@@ -1,74 +1,93 @@
 // routes/novas.js
 import express from 'express';
-import fetch from 'node-fetch'; // se ainda não tiver, adicione ou use global fetch no Node 18+
+import { slugifyForCoingecko, getUsdToBrl } from '../utils/coingecko.js';
 
 const router = express.Router();
 
-// ====== CONFIG ======
-const TTL_MS = 90_000;         // 90s de validade normal do cache
-const COOLDOWN_MS = 180_000;    // 3min de pausa após 429
-const MAX_COINS = 60;           // limite total
-const PAGE_SIZE = 30;           // por página
-const PAGES = Math.ceil(MAX_COINS / PAGE_SIZE);
-
-// cache compartilhado
-let NOVAS_CACHE = {
-  data: [],
-  t: 0,
-  cooldownUntil: 0,
-};
-
-// helper para saber se cache está fresco
-function cacheFresco() {
-  return Date.now() - NOVAS_CACHE.t < TTL_MS;
+// helper com retry simples
+async function fetchJson(url, { headers = {}, ...opts } = {}, retries = 2) {
+  const h = {
+    accept: 'application/json',
+    // Se tiver chave PRO:
+    // 'x-cg-pro-api-key': process.env.COINGECKO_API_KEY || '',
+    ...headers,
+  };
+  for (let i = 0; i <= retries; i++) {
+    const res = await fetch(url, { ...opts, headers: h });
+    if (res.ok) return res.json();
+    if (res.status === 429 && i < retries) {
+      await new Promise(r => setTimeout(r, 800 * (i + 1)));
+      continue;
+    }
+    // última tentativa falhou
+    try {
+      const txt = await res.text();
+      console.warn('[CoinGecko]', res.status, url, txt?.slice?.(0, 200));
+    } catch {}
+    return null;
+  }
 }
-function emCooldown() {
-  return Date.now() < NOVAS_CACHE.cooldownUntil;
+
+// markets por ranking
+async function getMarkets({ vs = 'usd', per_page = 60, page = 1, ids = [] } = {}) {
+  const base = 'https://api.coingecko.com/api/v3/coins/markets';
+  const qs = new URLSearchParams({
+    vs_currency: vs,
+    order: 'market_cap_asc',
+    per_page: String(per_page),
+    page: String(page),
+    sparkline: 'false',
+    price_change_percentage: '24h',
+  });
+  if (ids?.length) qs.set('ids', ids.join(','));
+  const url = `${base}?${qs.toString()}`;
+  const data = await fetchJson(url);
+  return Array.isArray(data) ? data : [];
 }
 
+async function getTrendingIds() {
+  const j = await fetchJson('https://api.coingecko.com/api/v3/search/trending');
+  const list = j?.coins || [];
+  return list.map(c => c?.item?.id).filter(Boolean);
+}
+
+// PÚBLICO: não exige verifyToken
 router.get('/', async (req, res) => {
   try {
-    // Se ainda em cooldown ou cache fresco -> devolve cache
-    if (emCooldown() || cacheFresco()) {
-      return res.json(NOVAS_CACHE.data);
+    const limit = Math.min(Number(req.query.limit ?? 24), 100);
+    const usdbrl = await getUsdToBrl();
+
+    // 1) tenta markets “normais”
+    let markets = await getMarkets({ per_page: Math.max(limit, 60), page: 1 });
+
+    // 2) fallback: trending
+    if (!markets.length) {
+      const ids = await getTrendingIds();
+      if (ids.length) {
+        markets = await getMarkets({ ids, per_page: Math.min(ids.length, 60) });
+      }
     }
 
-    // Monta as páginas (reduzido para não estourar limite)
-    const urls = Array.from({ length: PAGES }, (_, i) =>
-      `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_asc&per_page=${PAGE_SIZE}&page=${i+1}&sparkline=false&price_change_percentage=24h`
-    );
-
-    // busca em série (menos agressivo) — se quiser, faça em paralelo com Promise.all
-    const results = [];
-    for (const url of urls) {
-      const r = await fetch(url);
-      // Tratamento explícito de 429
-      if (r.status === 429) {
-        // entra em cooldown e devolve cache antigo
-        NOVAS_CACHE.cooldownUntil = Date.now() + COOLDOWN_MS;
-        return res.json(NOVAS_CACHE.data);
-      }
-      if (!r.ok) {
-        // se outro erro, usa cache se existir
-        if (NOVAS_CACHE.data.length) return res.json(NOVAS_CACHE.data);
-        const txt = await r.text().catch(() => '');
-        return res.status(502).json({ error: 'Falha ao consultar CoinGecko', detail: txt });
-      }
-      const json = await r.json();
-      results.push(...json);
+    // 3) fallback final: mais uma chamada
+    if (!markets.length) {
+      markets = await getMarkets({ per_page: Math.max(limit, 24), page: 1 });
     }
 
-    // Limita ao máximo desejado e salva no cache
-    NOVAS_CACHE.data = results.slice(0, MAX_COINS);
-    NOVAS_CACHE.t = Date.now();
-    NOVAS_CACHE.cooldownUntil = 0; // limpamos cooldown se obteve dados
-    return res.json(NOVAS_CACHE.data);
+    const out = markets.slice(0, limit).map(c => ({
+      id: c.id,
+      coingeckoId: c.id,
+      name: c.name,
+      symbol: c.symbol,
+      image: c.image,
+      current_price: Number(c.current_price),
+      brl_price: Number(c.current_price) * usdbrl,
+      price_change_percentage_24h: Number(c.price_change_percentage_24h),
+    }));
 
+    return res.json(out);
   } catch (err) {
-    console.error('[NOVAS] erro:', err);
-    // No erro, devolve cache se existir
-    if (NOVAS_CACHE.data.length) return res.json(NOVAS_CACHE.data);
-    return res.status(500).json({ error: 'Erro ao carregar novas criptos' });
+    console.error('Erro em /api/novas:', err);
+    return res.json([]);
   }
 });
 
