@@ -1,6 +1,6 @@
 // routes/novas.js
 import express from 'express';
-import { getUsdToBrl } from '../utils/coinGecko.js';
+import { getUsdToBrl } from '../utils/coingecko.js';
 
 const router = express.Router();
 
